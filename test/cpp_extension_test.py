@@ -46,7 +46,7 @@ class LLTMpy(torch.nn.Module):
 
         return new_h, new_cell
 
-class LLTMFunction(torch.autograd.Function):
+class LLTMFunctionCpp(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input, weights, bias, old_h, old_cell):
         outputs = pybind_cuda.forward(input, weights, bias, old_h, old_cell)
@@ -64,9 +64,9 @@ class LLTMFunction(torch.autograd.Function):
         return d_input, d_weights, d_bias, d_old_h, d_old_cell
 
 
-class LLTM(torch.nn.Module):
+class LLTMcpp(torch.nn.Module):
     def __init__(self, input_features, state_size):
-        super(LLTM, self).__init__()
+        super(LLTMcpp, self).__init__()
         self.input_features = input_features
         self.state_size = state_size
         self.weights = torch.nn.Parameter(
@@ -80,52 +80,126 @@ class LLTM(torch.nn.Module):
             weight.data.uniform_(-stdv, +stdv)
 
     def forward(self, input, state):
-        return LLTMFunction.apply(input, self.weights, self.bias, *state)
+        return LLTMFunctionCpp.apply(input, self.weights, self.bias, *state)
 
-def python_implementation(num_iter):
+def python_implementation():
     batch_size = 16
     input_features = 32
     state_size = 128
+
+    # Note the device=cuda_device arguments here
     X = torch.randn(batch_size, input_features)
     h = torch.randn(batch_size, state_size)
     C = torch.randn(batch_size, state_size)
+
     rnn = LLTMpy(input_features, state_size)
-    start = time.time()
-    for i in range(num_iter):
-        new_h, new_C = rnn(X, (h, C))
-        (new_h.sum() + new_C.sum()).backward()
-        # h = new_h
-        # C = new_C
-    end = time.time()
-    return end - start
 
-def cpp_implementation(num_iter):
+    forward = 0
+    backward = 0
+    for _ in range(100000):
+        start = time.time()
+        new_h, new_C = rnn(X, (h, C))
+        forward += time.time() - start
+
+        start = time.time()
+        (new_h.sum() + new_C.sum()).backward()
+        backward += time.time() - start
+    print('Forward: {:.3f} us | Backward {:.3f} us'.format(forward * 1e6/1e5, backward * 1e6/1e5))
+
+def cpp_implementation():
     batch_size = 16
     input_features = 32
     state_size = 128
+
+    # Note the device=cuda_device arguments here
     X = torch.randn(batch_size, input_features)
     h = torch.randn(batch_size, state_size)
     C = torch.randn(batch_size, state_size)
-    rnn = LLTM(input_features, state_size)
-    start = time.time()
-    for i in range(num_iter):
+
+    rnn = LLTMcpp(input_features, state_size)
+
+    forward = 0
+    backward = 0
+    for _ in range(100000):
+        start = time.time()
         new_h, new_C = rnn(X, (h, C))
+        forward += time.time() - start
+
+        start = time.time()
         (new_h.sum() + new_C.sum()).backward()
-        # h = new_h
-        # C = new_C
-    end = time.time()
-    return end - start
+        backward += time.time() - start
+    print('Forward: {:.3f} us | Backward {:.3f} us'.format(forward * 1e6/1e5, backward * 1e6/1e5))
 
+def python_implementation_cu():
+    assert torch.cuda.is_available()
+    cuda_device = torch.device("cuda")  # device object representing GPU
 
+    batch_size = 16
+    input_features = 32
+    state_size = 128
+
+    # Note the device=cuda_device arguments here
+    X = torch.randn(batch_size, input_features, device=cuda_device)
+    h = torch.randn(batch_size, state_size, device=cuda_device)
+    C = torch.randn(batch_size, state_size, device=cuda_device)
+
+    rnn = LLTMpy(input_features, state_size).to(cuda_device)
+
+    forward = 0
+    backward = 0
+    for _ in range(100000):
+        start = time.time()
+        new_h, new_C = rnn(X, (h, C))
+        torch.cuda.synchronize()
+        forward += time.time() - start
+
+        start = time.time()
+        (new_h.sum() + new_C.sum()).backward()
+        torch.cuda.synchronize()
+        backward += time.time() - start
+    print('Forward: {:.3f} us | Backward {:.3f} us'.format(forward * 1e6/1e5, backward * 1e6/1e5))
+
+def cpp_implementation_cu():
+    assert torch.cuda.is_available()
+    cuda_device = torch.device("cuda")  # device object representing GPU
+
+    batch_size = 16
+    input_features = 32
+    state_size = 128
+
+    # Note the device=cuda_device arguments here
+    X = torch.randn(batch_size, input_features, device=cuda_device)
+    h = torch.randn(batch_size, state_size, device=cuda_device)
+    C = torch.randn(batch_size, state_size, device=cuda_device)
+
+    rnn = LLTMcpp(input_features, state_size).to(cuda_device)
+
+    forward = 0
+    backward = 0
+    for _ in range(100000):
+        start = time.time()
+        new_h, new_C = rnn(X, (h, C))
+        torch.cuda.synchronize()
+        forward += time.time() - start
+
+        start = time.time()
+        (new_h.sum() + new_C.sum()).backward()
+        torch.cuda.synchronize()
+        backward += time.time() - start
+    print('Forward: {:.3f} us | Backward {:.3f} us'.format(forward * 1e6/1e5, backward * 1e6/1e5))
 
 
 if __name__ == '__main__':
     assert pybind_cuda.is_cpp_extension_init()
 
-    # Python time: 2.7301106452941895
-    py_time = python_implementation(10000)
-    print("Python time: {}".format(py_time))
+    python_implementation()
+    cpp_implementation()
 
-    # C++ time: 3.4798851013183594
-    cpp_time = cpp_implementation(10000)
-    print("C++ time: {}".format(cpp_time))
+    python_implementation_cu()
+    cpp_implementation_cu()
+
+    # ??? This is so strange ???
+    # Forward: 115.215 us | Backward 171.027 us
+    # Forward: 99.602 us | Backward 282.254 us
+    # Forward: 368.693 us | Backward 588.300 us
+    # Forward: 311.143 us | Backward 942.109 us
