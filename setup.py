@@ -10,5 +10,5 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension
 # remove -c from sys.argv
 
 setup(name='pybind_cuda',
-      ext_modules=[CppExtension('pybind_torch', ['main.cpp', 'modules/cpp_extension.cpp'])],
+      ext_modules=[CppExtension('pybind_torch', ['main.cpp', 'modules/cpp_extension.cpp', 'modules/cuda_extensions.cpp', 'modules/cuda_kernel.cu'])],
       cmdclass={'build_ext': BuildExtension})

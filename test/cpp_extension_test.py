@@ -4,7 +4,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pybind_cuda
+import pybind_cuda_cu as pybind_cuda
 
 
 
