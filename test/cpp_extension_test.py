@@ -122,10 +122,10 @@ def cpp_implementation(num_iter):
 if __name__ == '__main__':
     assert pybind_cuda.is_cpp_extension_init()
 
-    # Python time: 0.6146454811096191
-    py_time = python_implementation(1000)
+    # Python time: 2.7301106452941895
+    py_time = python_implementation(10000)
     print("Python time: {}".format(py_time))
 
-    # C++ time: 0.4918818473815918
-    cpp_time = cpp_implementation(1000)
+    # C++ time: 3.4798851013183594
+    cpp_time = cpp_implementation(10000)
     print("C++ time: {}".format(cpp_time))

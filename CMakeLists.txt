@@ -3,9 +3,9 @@ project(pybind_cuda)
 
 find_package(CUDA REQUIRED)
 
-include_directories("/home/lazurite/anaconda3/envs/pytorch/lib/python3.8/site-packages/torch/include")
-include_directories("/home/lazurite/anaconda3/envs/pytorch/lib/python3.8/site-packages/torch/include/torch/csrc/api/include/")
-set(PYTHON_EXECUTABLE /home/lazurite/anaconda3/envs/pytorch/bin/python)
+include_directories("/home/ubuntu/anaconda3/envs/Openpcdet/lib/python3.8/site-packages/torch/include")
+include_directories("/home/ubuntu/anaconda3/envs/Openpcdet/lib/python3.8/site-packages/torch/include/torch/csrc/api/include/")
+set(PYTHON_EXECUTABLE /home/ubuntu/anaconda3/envs/Openpcdet/bin/python)
 add_subdirectory(extern/pybind11)
 
 
